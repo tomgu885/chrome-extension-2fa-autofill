@@ -1,0 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { mkdir, rm, copyFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('../', import.meta.url));
+await mkdir(`${root}artifacts`, { recursive: true });
+await copyFile(`${root}INSTALL.md`, `${root}dist/INSTALL.md`);
+const output = `${root}artifacts/local-authenticator-1.0.0.zip`;
+await rm(output, { force: true });
+execFileSync('zip', ['-qr', output, '.'], { cwd: `${root}dist` });
+console.log('Packaged artifacts/local-authenticator-1.0.0.zip');

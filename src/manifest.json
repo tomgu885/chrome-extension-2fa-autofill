@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "本地验证器 · Local Authenticator",
+  "version": "1.0.0",
+  "minimum_chrome_version": "120",
+  "description": "本地 TOTP 验证器：无限账号、自动填充、二维码导入、加密备份与 Chrome 加密同步。所有功能免费开放。",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "activeTab",
+    "scripting",
+    "contextMenus",
+    "clipboardWrite"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "本地验证器",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png",
+      "48": "icons/48.png",
+      "128": "icons/128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' data:; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoixpJYJf4Ykx2aCugTK2aMvOO4Du777O+ol9W0XrwEJlIw9InXx0e+QIui7TvFPnO74WdyvCkGqscaiBX/xXJ0k3d2PlRk9kbgkdJD1WC5aJ+HlsntuXvzdPHqwWJkyDCt7ZGGEtBJJSFiYnIiZXb7pCyPUpPPAv6JvD7YdbDADilEC6Wg4rwbvH7V20Py2DYrt8HRZYWITGL004z2WZTEiYh+Ikt05KPqId9oB66A20IGw8KaBRSeIeGp6IDBckmouV2ZtIMLMp2zG4zLKEvGww3EqZU5k//bKK0IKh6CViQXi4W3xZoN9PHJ8WOzcdDhV0LwTunJJQ1TA5KD322wIDAQAB"
+}

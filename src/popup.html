@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>本地验证器 · Local Authenticator</title><link rel="icon" href="icons/48.png"><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <div class="shell">
+    <header><div class="brand"><img src="icons/48.png" alt="" width="38" height="38"><div><h1>本地验证器</h1><p>LOCAL AUTHENTICATOR</p></div></div><button id="expand" class="icon-button" title="在标签页中打开" aria-label="在标签页中打开">↗</button></header>
+    <div class="privacy"><span class="dot"></span> 密钥留在设备上 <span class="privacy-end">全部功能已开放</span></div>
+    <nav aria-label="功能"><button data-view="accounts" class="active">账号</button><button data-view="import">导入</button><button data-view="backup">备份与同步</button><button data-view="settings">设置</button></nav>
+    <main>
+      <section id="accounts-view" class="view">
+        <div class="section-heading"><div><h2>你的验证码 <span id="count" class="count">0</span></h2><p>一个地方，管理每一个账号。</p></div><button id="add-account" class="primary small">＋ 添加</button></div>
+        <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索账号、服务或标签" aria-label="搜索账号、服务或标签"><kbd>/</kbd></label>
+        <div id="folders" class="filters" aria-label="文件夹"></div>
+        <div id="account-list" aria-live="polite"></div>
+        <div id="empty" class="empty"><div class="empty-icon">⌁</div><h3>让登录更简单</h3><p>添加你的第一个 TOTP 账号，<br>验证码就会在这里自动更新。</p><button id="empty-add" class="primary">添加账号</button><button data-go="import" class="text-button">从二维码导入 →</button></div>
+        <div class="site-panel"><div><span class="eyebrow">当前网站</span><p id="current-site">请在登录网站打开扩展</p></div><button id="enable-site" class="secondary small" disabled>启用填充</button></div>
+        <p class="hint">只在授权网站且账号唯一匹配时填充，不自动提交表单。</p>
+      </section>
+      <section id="import-view" class="view" hidden>
+        <h2>把账号带过来</h2><p class="description">支持 TOTP 二维码、Google Authenticator 迁移二维码，以及 otpauth 链接。</p>
+        <label class="upload-zone"><span class="upload-symbol">▧</span><strong>选择二维码图片</strong><span>可多选 · PNG / JPG / WebP</span><input id="qr-files" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
+        <div class="divider">或粘贴链接</div>
+        <label class="field">TOTP / 迁移链接<textarea id="import-text" rows="3" placeholder="otpauth://totp/…" autocomplete="off" spellcheck="false"></textarea></label>
+        <button id="parse-import" class="secondary">读取链接</button>
+        <div id="import-preview" hidden><div class="section-heading"><h3>待导入账号</h3><button id="clear-import" class="text-button">清空</button></div><p id="batch-status" class="hint"></p><ul id="import-accounts" class="preview-list"></ul><label class="field">文件夹（可选）<input id="import-folder" placeholder="例如：工作 / 客户 A"></label><label class="field">登录网站（可选，逗号分隔）<input id="import-domains" placeholder="例如：github.com, login.example.com"></label><button id="confirm-import" class="primary full">确认导入</button></div>
+        <div class="note">在网页二维码上点右键，选择“添加此处的 2FA 二维码”即可扫描当前画面。Google 迁移有多张二维码时，请全部添加后确认。</div>
+      </section>
+      <section id="backup-view" class="view" hidden>
+        <h2>备份与同步</h2><p class="description">由你的口令加密。请记住口令，无法找回。</p>
+        <div class="panel"><div class="panel-title"><span class="panel-icon">↓</span><div><h3>加密备份</h3><p>把账号安全地保存在自己的文件中。</p></div></div><label class="field">加密口令（至少 12 个字符）<input id="backup-passphrase" type="password" autocomplete="new-password" minlength="12" placeholder="使用独立的长口令"></label><label class="field">再次输入口令<input id="backup-confirm" type="password" autocomplete="new-password"></label><button id="export-backup" class="primary full">导出加密备份</button><div class="divider">恢复已有备份</div><label class="field">选择加密备份文件<input id="backup-file" type="file" accept=".json,application/json"></label><label class="field">备份口令<input id="restore-passphrase" type="password" autocomplete="off"></label><button id="restore-backup" class="secondary full">解密并合并账号</button><p class="hint">恢复会保留本地账号，跳过重复项。</p></div>
+        <div class="panel"><div class="panel-title"><span class="panel-icon">⇄</span><div><h3>Chrome 加密同步</h3><p id="sync-status">默认关闭，仅同步加密后的快照。</p></div></div><label class="field">同步口令（至少 12 个字符）<input id="sync-passphrase" type="password" autocomplete="off"></label><button id="unlock-sync" class="secondary full">创建 / 解锁同步</button><div class="button-row"><button id="upload-sync" class="secondary" disabled>上传本地快照</button><button id="download-sync" class="secondary" disabled>拉取并合并</button><button id="lock-sync" class="text-button" disabled>锁定</button></div><p class="hint">手动上传与拉取。两台设备需使用同一 Chrome 同步账号，并开启扩展同步。重启浏览器后需重新解锁。云端约 100 KB，较大的账号库请用备份文件。</p></div>
+      </section>
+      <section id="settings-view" class="view" hidden>
+        <h2>按你的方式使用</h2><div class="panel"><label class="toggle-row"><div><strong>自动填充验证码</strong><p>在授权网站上识别并填入 TOTP。</p></div><input id="autofill-toggle" type="checkbox" role="switch"></label></div>
+        <div class="panel"><h3>已授权的网站</h3><div id="permission-list"></div><p class="hint">在目标网站打开扩展，点击“启用填充”授权。另需在账号中填写完整主机名。子域名分别配置。</p></div>
+        <div class="panel"><h3>设备上的数据</h3><p class="description">密钥保存在此 Chrome 用户资料的本地扩展存储中，本地存储不另设口令锁。备份和同步采用 AES-256-GCM 加密。</p><p class="description">无账号注册、广告、统计或许可证校验。卸载扩展会移除本地账号，请先导出备份。</p></div>
+      </section>
+    </main>
+    <footer><span>● 100% 本地生成</span><span>v1.0.0</span></footer>
+  </div>
+  <dialog id="account-dialog"><form id="account-form"><div class="section-heading"><h2 id="editor-title">添加账号</h2><button type="button" id="close-editor" class="icon-button" aria-label="关闭">×</button></div><input name="id" type="hidden"><label class="field">服务名称<input name="issuer" maxlength="500" placeholder="例如：GitHub"></label><label class="field">用户名 / 邮箱<input name="username" required maxlength="500" autocomplete="off" placeholder="与登录时的用户名一致"></label><label class="field">TOTP 密钥（Base32）<input name="secret" type="password" required autocomplete="off" spellcheck="false" placeholder="输入网站提供的设置密钥"></label><label class="field">登录网站（逗号分隔）<input name="domains" placeholder="例如：github.com, login.example.com"><span class="hint">精确匹配主机名，不含路径；不要填邮箱域名。</span></label><div class="two-col"><label class="field">文件夹<input name="folder" list="folder-options" placeholder="工作 / 客户"></label><label class="field">标签（逗号分隔）<input name="labels" placeholder="开发, 生产"></label></div><datalist id="folder-options"></datalist><details><summary>高级 TOTP 参数</summary><div class="three-col"><label class="field">算法<select name="algorithm"><option>SHA1</option><option>SHA256</option><option>SHA512</option></select></label><label class="field">位数<select name="digits"><option>6</option><option>8</option></select></label><label class="field">周期 / 秒<input name="period" type="number" min="5" max="300" value="30" required></label></div></details><label class="checkbox-row"><input name="pinned" type="checkbox">置顶这个账号</label><label class="checkbox-row"><input name="allowWithoutUsername" type="checkbox">页面无用户名时，允许单账号匹配填充</label><p class="hint">默认同时匹配网站和用户名。多个候选账号时不会自动填充。</p><p id="editor-error" class="error" role="alert"></p><button type="submit" class="primary full">保存账号</button></form></dialog>
+  <div id="toast" role="status" hidden></div>
+  <script type="module" src="popup.js"></script>
+</body></html>

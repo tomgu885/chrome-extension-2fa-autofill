@@ -1,0 +1,10 @@
+import { build } from 'esbuild';
+import { cp, mkdir, rm } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('../', import.meta.url));
+await rm(`${root}dist`, { recursive: true, force: true });
+await mkdir(`${root}dist`, { recursive: true });
+await build({ entryPoints: [`${root}src/background.js`, `${root}src/popup.js`, `${root}src/content.js`], bundle: true, outdir: `${root}dist`, format: 'esm', target: 'chrome120', legalComments: 'eof', logLevel: 'warning' });
+for (const file of ['manifest.json', 'popup.html', 'popup.css', 'icons']) await cp(`${root}src/${file}`, `${root}dist/${file}`, { recursive: true });
+await cp(`${root}node_modules/jsqr/LICENSE`, `${root}dist/JSQR-LICENSE.txt`);
+console.log('Built dist/ — ready to load as an unpacked extension.');
