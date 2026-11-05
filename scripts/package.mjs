@@ -1,10 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { mkdir, rm, copyFile } from 'node:fs/promises';
+import { mkdir, rm, copyFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
+const { version } = JSON.parse(await readFile(`${root}package.json`, 'utf8'));
+const manifest = JSON.parse(await readFile(`${root}dist/manifest.json`, 'utf8'));
+if (manifest.version !== version) throw new Error('Package and manifest versions must match before packaging.');
 await mkdir(`${root}artifacts`, { recursive: true });
-await copyFile(`${root}INSTALL.md`, `${root}dist/INSTALL.md`);
-const output = `${root}artifacts/local-authenticator-1.0.0.zip`;
+for (const file of ['INSTALL.md', 'README.md']) await copyFile(`${root}${file}`, `${root}dist/${file}`);
+const output = `${root}artifacts/local-authenticator-${version}.zip`;
 await rm(output, { force: true });
 execFileSync('zip', ['-qr', output, '.'], { cwd: `${root}dist` });
-console.log('Packaged artifacts/local-authenticator-1.0.0.zip');
+console.log(`Packaged artifacts/local-authenticator-${version}.zip`);

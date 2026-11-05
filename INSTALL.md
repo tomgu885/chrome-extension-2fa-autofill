@@ -1,5 +1,7 @@
 # 本地验证器：安装
 
+安装包可从仓库的 [GitHub Actions 打包页面](https://github.com/tomgu885/chrome-extension-2fa-autofill/actions/workflows/package.yml) 获取：登录 GitHub，打开最近一次成功运行，在底部「Artifacts」下载 `local-authenticator-1.0.0.zip`。文件名随版本变化，产物保留 30 天；安装无需 Node.js。GitHub「Code → Download ZIP」提供的是源码，需按 [README.md](README.md) 构建后才能加载。
+
 1. 解压 `local-authenticator-1.0.0.zip` 到一个准备长期保留的文件夹。
 2. 在 Chrome 地址栏打开 `chrome://extensions`。
 3. 打开右上角「开发者模式」，点击「加载已解压的扩展程序」。

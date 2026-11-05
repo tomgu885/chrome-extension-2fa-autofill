@@ -1,0 +1,68 @@
+name: Package Chrome extension
+
+on:
+  push:
+    paths:
+      - '.github/workflows/package.yml'
+      - 'src/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'jsconfig.json'
+      - 'INSTALL.md'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Test and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run core tests
+        run: npm test
+
+      - name: Check JavaScript types
+        run: npm run check
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Install isolated test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Test extension in Chromium
+        run: npm run test:e2e
+
+      - name: Package tested build
+        run: node scripts/package.mjs
+
+      - name: Check ZIP integrity
+        run: unzip -t artifacts/local-authenticator-*.zip
+
+      - name: Upload installable ZIP
+        id: package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: artifacts/local-authenticator-*.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
