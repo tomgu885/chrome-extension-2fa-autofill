@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "本地验证器 · Local Authenticator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minimum_chrome_version": "120",
   "description": "本地 TOTP 验证器：无限账号、自动填充、二维码导入、加密备份与 Chrome 加密同步。所有功能免费开放。",
   "permissions": [

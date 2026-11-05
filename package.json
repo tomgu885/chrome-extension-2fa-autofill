@@ -1,6 +1,6 @@
 {
   "name": "local-authenticator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,9 @@
     "package": "npm run build && node scripts/package.mjs",
     "preview": "node scripts/preview.mjs"
   },
-  "dependencies": { "jsqr": "1.4.0" },
+  "dependencies": {
+    "jsqr": "1.4.0"
+  },
   "devDependencies": {
     "@types/chrome": "^0.1.24",
     "esbuild": "^0.25.0",
