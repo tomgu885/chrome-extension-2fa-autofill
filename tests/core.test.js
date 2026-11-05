@@ -4,7 +4,6 @@ import { validateAccount, decodeBase32, encodeBase32, normalizeHost, matchAccoun
 import { generateTOTP } from '../src/totp.js';
 import { parseImport, parseMigration } from '../src/import.js';
 import { createBackup, openBackup } from '../src/encryption.js';
-import { packSync, unpackSync } from '../src/sync.js';
 
 // All keys and passwords below are public synthetic test fixtures.
 const make = (overrides = {}) => validateAccount({ username: 'alice@example.com', issuer: 'Example', secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', domains: ['login.example.com'], ...overrides });
@@ -95,13 +94,4 @@ test('encrypted backups round trip, randomize, and reject wrong passwords and ta
   await assert.rejects(openBackup({ ...backup, ciphertext: (backup.ciphertext[0] === 'A' ? 'B' : 'A') + backup.ciphertext.slice(1) }, password));
   await assert.rejects(openBackup({ ...backup, iterations: 1 }, password));
   await assert.rejects(createBackup(vault, 'short'));
-});
-
-test('sync chunking meets per-item quota and rejects oversized or partial snapshots', async () => {
-  const backup = await createBackup({ version: 1, accounts: [make()] }, 'public-test-passphrase-only');
-  const items = packSync(backup, 'test-revision');
-  assert.deepEqual(unpackSync(items).envelope, backup);
-  assert.ok(Object.entries(items).every(([key, value]) => Buffer.byteLength(key + JSON.stringify(value)) < 8192));
-  assert.throws(() => unpackSync({ vaultMeta: { version: 1, revision: 'x', chunks: 2 }, 'vaultChunk.0': '{}' }));
-  assert.throws(() => packSync({ ...backup, ciphertext: 'A'.repeat(100_000) }));
 });

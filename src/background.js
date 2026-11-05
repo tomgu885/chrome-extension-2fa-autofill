@@ -1,12 +1,10 @@
 import { EMPTY_VAULT, validateAccount, mergeAccounts, matchAccount } from './model.js';
 import { generateTOTP } from './totp.js';
 import { createBackup, openBackup } from './encryption.js';
-import { unlockSync, uploadSync, downloadSync } from './sync.js';
 
 const defaults = { autofill: true };
 const ready = Promise.all([
   chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
-  chrome.storage.sync.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
   chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
 ]);
 
@@ -89,10 +87,8 @@ async function handleUI(message) {
   switch (message.type) {
     case 'STATE': {
       const { settings = defaults } = await chrome.storage.local.get('settings');
-      const { syncKey } = await chrome.storage.session.get('syncKey');
-      const { vaultMeta } = await chrome.storage.sync.get('vaultMeta');
       const { origins = [] } = await chrome.permissions.getAll();
-      return { vault, settings, origins, syncUnlocked: Boolean(syncKey), syncMeta: vaultMeta ?? null };
+      return { vault, settings, origins };
     }
     case 'SAVE': {
       const account = validateAccount(message.account);
@@ -114,14 +110,6 @@ async function handleUI(message) {
     case 'RESTORE': {
       const imported = await openBackup(message.envelope, message.passphrase);
       const result = mergeAccounts(vault.accounts, imported.accounts);
-      await saveVault({ version: 1, accounts: result.accounts }); return { added: result.added };
-    }
-    case 'SYNC_UNLOCK': return { remoteExists: await unlockSync(message.passphrase, vault) };
-    case 'SYNC_LOCK': await chrome.storage.session.remove('syncKey'); return null;
-    case 'SYNC_UPLOAD': return uploadSync(vault);
-    case 'SYNC_DOWNLOAD': {
-      const remote = await downloadSync();
-      const result = mergeAccounts(vault.accounts, remote.accounts);
       await saveVault({ version: 1, accounts: result.accounts }); return { added: result.added };
     }
     case 'REGISTER': await registerSites(); return null;

@@ -7,7 +7,7 @@ export const fromBase64 = text => Uint8Array.from(atob(text), x => x.charCodeAt(
 export async function deriveKey(passphrase, salt) {
   if (typeof passphrase !== 'string' || passphrase.length < 12) throw new Error('加密口令至少需要 12 个字符。');
   const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: ITERATIONS }, material, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: ITERATIONS }, material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 
 export async function encryptVault(vault, key, salt) {

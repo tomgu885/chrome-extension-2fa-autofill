@@ -12,7 +12,7 @@ globalThis.chrome = {
     let data = null;
     try {
       switch (message.type) {
-        case 'STATE': data = { vault, settings, origins: ['https://github.com/*'], syncUnlocked: false, syncMeta: null }; break;
+        case 'STATE': data = { vault, settings, origins: ['https://github.com/*'] }; break;
         case 'SAVE': { const item = validateAccount(message.account); vault.accounts = [...vault.accounts.filter(x => x.id !== item.id), item]; break; }
         case 'DELETE': vault.accounts = vault.accounts.filter(x => x.id !== message.id); break;
         case 'SETTINGS': settings = { autofill: message.autofill }; break;

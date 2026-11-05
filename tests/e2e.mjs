@@ -34,7 +34,9 @@ for (const index of [0, 1]) {
 }
 const qrImage = await readFile(`${temporary}/qr.png`);
 const input = '<label>验证码<input id="otp" autocomplete="one-time-code" inputmode="numeric" maxlength="6"></label>';
+let privacyProbeRequests = 0;
 const server = http.createServer((req, res) => {
+  if (req.url === '/privacy-probe') { privacyProbeRequests++; res.writeHead(200).end('public probe'); return; }
   if (req.url === '/qr.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(qrImage); return; }
   if (req.url === '/favicon.ico') { res.writeHead(204).end(); return; }
   let html = '';
@@ -58,6 +60,15 @@ try {
   });
   context.setDefaultTimeout(12_000);
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
+  await worker.evaluate(() => {
+    globalThis.__cloudApiCalls = 0;
+    const area = chrome.storage.sync;
+    for (const method of ['get', 'set', 'remove', 'clear', 'getBytesInUse', 'setAccessLevel']) {
+      const blocked = () => { globalThis.__cloudApiCalls++; throw new Error('Cloud storage access is forbidden in this test.'); };
+      area[method] = blocked;
+      if (area[method] !== blocked) throw new Error('Could not install the cloud storage audit trap.');
+    }
+  });
   const extensionId = new URL(worker.url()).host;
   const ui = await context.newPage();
   const errors = [];
@@ -162,7 +173,7 @@ try {
   const id = (await call('STATE')).vault.accounts.find(x => x.username === 'qr@example.com').id;
   await call('DELETE', { id });
   verify((await call('RESTORE', { envelope: encrypted, passphrase: PASSWORD })).added === 1, 'Restore failed to merge missing account');
-  await ui.getByRole('button', { name: '备份与同步', exact: true }).click();
+  await ui.getByRole('button', { name: '本地备份', exact: true }).click();
   await ui.locator('#backup-passphrase').fill(PASSWORD);
   await ui.locator('#backup-confirm').fill(PASSWORD);
   const downloaded = ui.waitForEvent('download');
@@ -173,16 +184,20 @@ try {
   verify(exported.format === 'local-authenticator' && !JSON.stringify(exported).includes(SECRET), 'Backup download is not encrypted');
   checks.push('encrypted backup file download, bad-password rejection, merge restore');
 
-  await call('SYNC_UNLOCK', { passphrase: PASSWORD });
-  const syncStorage = await worker.evaluate(() => chrome.storage.sync.get(null));
-  verify(Boolean(syncStorage.vaultMeta), 'Encrypted sync was not stored');
-  verify(!JSON.stringify(syncStorage).includes(SECRET) && !JSON.stringify(syncStorage).includes(PASSWORD), 'Sync leaked secret or passphrase');
-  await call('SYNC_LOCK');
-  verify(!(await call('STATE')).syncUnlocked, 'Sync lock did not clear session key');
-  await call('SYNC_UNLOCK', { passphrase: PASSWORD });
-  await call('SYNC_DOWNLOAD');
-  await call('SYNC_UPLOAD');
-  checks.push('real chrome.storage.sync encrypted chunks, unlock/lock, pull/upload');
+  verify(await ui.locator('[id*="sync"]').count() === 0, 'Cloud sync controls are still present');
+  for (const type of ['SYNC_UNLOCK', 'SYNC_UPLOAD', 'SYNC_DOWNLOAD', 'SYNC_LOCK']) {
+    const response = await ui.evaluate(message => chrome.runtime.sendMessage(message), { type, passphrase: PASSWORD });
+    verify(response?.ok === false, 'A removed cloud sync command was accepted');
+  }
+  checks.push('cloud sync controls removed and all legacy sync commands rejected');
+
+  const networkGuard = await ui.evaluate(async url => {
+    const violation = new Promise(resolve => addEventListener('securitypolicyviolation', event => resolve(event.effectiveDirective), { once: true }));
+    const rejected = await fetch(url, { method: 'POST', body: 'public-network-probe' }).then(() => false, () => true);
+    return { rejected, directive: rejected ? await violation : null };
+  }, `${address}/privacy-probe`);
+  verify(networkGuard.rejected && networkGuard.directive === 'connect-src' && privacyProbeRequests === 0, 'Extension CSP allowed a network POST');
+  checks.push('connect-src none blocks an extension-page network POST before reaching the server');
 
   await login.bringToFront(); await login.goto(`${address}/qr`);
   const screenshot = await worker.evaluate(async () => {
@@ -214,7 +229,9 @@ try {
   });
   verify(security.blocked && !security.privileged, 'Untrusted content obtained privileged vault access');
   verify(errors.length === 0, 'Extension UI raised a page error');
+  verify(await worker.evaluate(() => globalThis.__cloudApiCalls) === 0, 'Runtime touched Chrome cloud storage');
   checks.push('content storage isolation and privileged-message rejection');
+  checks.push('account operations, local QR capture, encrypted export/restore, and removed commands never access cloud storage');
   await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host and screenshot permission pre-granted only in test copy; no real Google account, native host-permission dialog, or native context-menu click' }, null, 2));
   console.log(`Passed ${checks.length} extension E2E checks. Evidence: artifacts/e2e-results.json`);
 } finally {

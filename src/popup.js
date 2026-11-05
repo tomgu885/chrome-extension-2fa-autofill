@@ -45,8 +45,6 @@ async function refresh() {
   state = await request('STATE');
   $('#count').textContent = String(state.vault.accounts.length);
   $('#autofill-toggle').checked = state.settings.autofill;
-  $('#sync-status').textContent = state.syncUnlocked ? '本次浏览器会话已解锁。可上传或拉取。' : state.syncMeta ? '云端已有加密快照，输入口令解锁。' : '默认关闭，仅同步加密后的快照。';
-  ['#upload-sync', '#download-sync', '#lock-sync'].forEach(x => { $(x).disabled = !state.syncUnlocked; });
   const folders = [...new Set(state.vault.accounts.map(x => x.folder).filter(Boolean))].sort();
   $('#folder-options').replaceChildren(...folders.map(x => { const option = document.createElement('option'); option.value = x; return option; }));
   if (folder && folder !== '__pinned' && !folders.includes(folder)) folder = '';
@@ -189,13 +187,6 @@ action('#restore-backup', async () => {
   const result = await request('RESTORE', { envelope: JSON.parse(await file.text()), passphrase: $('#restore-passphrase').value });
   $('#restore-passphrase').value = ''; $('#backup-file').value = ''; await refresh(); toast(`已恢复 ${result.added} 个账号`);
 });
-action('#unlock-sync', async () => {
-  const result = await request('SYNC_UNLOCK', { passphrase: $('#sync-passphrase').value });
-  $('#sync-passphrase').value = ''; await refresh(); toast(result.remoteExists ? '同步已解锁，请按需拉取或上传快照' : '已创建并上传加密快照');
-});
-action('#upload-sync', async () => { await request('SYNC_UPLOAD'); await refresh(); toast('加密快照已上传'); });
-action('#download-sync', async () => { const result = await request('SYNC_DOWNLOAD'); await refresh(); toast(`已拉取并合并 ${result.added} 个账号`); });
-$('#lock-sync').addEventListener('click', async () => { await request('SYNC_LOCK'); await refresh(); toast('同步已锁定'); });
 $('#autofill-toggle').addEventListener('change', async event => { try { await request('SETTINGS', { autofill: event.target.checked }); await refresh(); } catch (error) { toast(safeError(error), true); } });
 action('#enable-site', async () => {
   if (!currentTab?.url) return;
@@ -219,7 +210,8 @@ async function init() {
   if (params.has('capture')) {
     switchView('import'); const capture = await request('CAPTURE', { token: params.get('capture') });
     $('#import-domains').value = capture.host;
-    const response = await fetch(capture.image); await parseImages([await response.blob()]);
+    const image = new Blob([Uint8Array.from(atob(capture.image.split(',')[1]), char => char.charCodeAt(0))], { type: 'image/png' });
+    await parseImages([image]);
   }
   setInterval(() => { tick().catch(() => {}); }, 1000);
 }
