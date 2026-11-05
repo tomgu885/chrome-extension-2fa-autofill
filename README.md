@@ -10,14 +10,11 @@
 
 ### 方式一：使用已构建的安装包
 
-无需在本机安装 Node.js 或 Git，可以直接下载 GitHub 构建的安装包：
+**[下载 v1.0.0 安装包（ZIP，无需登录 GitHub）](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/download/v1.0.0/local-authenticator-1.0.0.zip)** · [查看最新正式版](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest)
 
-1. 打开仓库的 [GitHub Actions 打包页面](https://github.com/tomgu885/chrome-extension-2fa-autofill/actions/workflows/package.yml)。
-2. 选择最近一次成功的 **Package Chrome extension** 运行，核对分支和提交。
-3. 在运行详情底部的 **Artifacts** 区域，下载 `local-authenticator-1.0.0.zip`（名称随版本变化）。下载需要登录 GitHub，构建产物保留 30 天。
-4. 下载后按下面步骤安装。如果没有可用安装包，仓库有写入权限的用户可点击 **Run workflow**，选择分支后启动打包；普通用户也可按方式二自行构建。
+安装包通过 GitHub Releases 提供，无需在本机安装 Node.js 或 Git，也不受 Actions 构建产物 30 天保留期限制。请下载发布页面 **Assets** 中的 `local-authenticator-1.0.0.zip`，不要选择自动生成的 **Source code (zip)** 或 **Source code (tar.gz)**，它们是需要构建的源码包。
 
-如果你已从其他途径获得同样的已构建安装包，也可以直接安装：
+下载后按以下步骤安装：
 
 1. 将安装包解压到一个准备长期保留的文件夹。
 2. 在 Chrome 地址栏输入 `chrome://extensions` 并打开。
@@ -57,7 +54,9 @@ npm run package
 
 流程依次安装依赖、执行核心测试与类型检查、构建扩展、在隔离的无头 Chromium 中执行端到端测试，全部通过后生成并上传可安装 ZIP。打包名称从 `package.json` 读取版本，并检查它与构建后的 `manifest.json` 一致。安装包直接包含 `manifest.json` 等文件，解压一次即可加载。
 
-GitHub 执行构建和测试，无需 Chrome Web Store 发布，也无需配置任何账号密钥或 Secrets。工作流仅申请仓库内容读取权限，安装包通过 Actions Artifacts 下载。
+GitHub 执行构建和测试，无需 Chrome Web Store 发布，也无需配置任何账号密钥或 Secrets。工作流仅申请仓库内容读取权限。普通用户安装推荐使用上方的 GitHub Releases 正式版。
+
+如需测试分支的最新构建，可打开 [GitHub Actions 打包页面](https://github.com/tomgu885/chrome-extension-2fa-autofill/actions/workflows/package.yml)，选择最近一次成功运行，在底部 **Artifacts** 下载 ZIP；此入口需要登录 GitHub，构建产物保留 30 天。仓库有写入权限的用户也可点击 **Run workflow** 手动打包。Actions 工作流不会自动发布或覆盖 Releases。
 
 ## 使用
 
