@@ -2,6 +2,8 @@ name: Package Chrome extension
 
 on:
   push:
+    branches: ['**']
+    tags: ['v*']
     paths:
       - '.github/workflows/package.yml'
       - 'src/**'
@@ -22,6 +24,10 @@ jobs:
     name: Test and package
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact-id: ${{ steps.package.outputs.artifact-id }}
+      artifact-digest: ${{ steps.package.outputs.artifact-digest }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,6 +39,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      - name: Check package, manifest, and version tag
+        id: version
+        run: node scripts/check-version.mjs
 
       - name: Install dependencies
         run: npm ci
@@ -66,3 +76,54 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish version tag
+    needs: package
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERSION: ${{ needs.package.outputs.version }}
+      RELEASE_TAG: ${{ github.ref_name }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download verified build from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.package.outputs.artifact-id }}
+        run: |
+          mkdir -p artifacts/release
+          gh api "repos/$GH_REPO/actions/artifacts/$ARTIFACT_ID/zip" > "artifacts/release/local-authenticator-$VERSION.zip"
+
+      - name: Prepare versioned ZIP, latest ZIP, checksums, and release notes
+        env:
+          EXPECTED_DIGEST: ${{ needs.package.outputs.artifact-digest }}
+        run: node scripts/prepare-release.mjs "$VERSION" artifacts/release
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "artifacts/release/local-authenticator-$VERSION.zip" \
+            artifacts/release/local-authenticator.zip \
+            artifacts/release/SHA256SUMS.txt \
+            --verify-tag \
+            --title "本地验证器 $RELEASE_TAG" \
+            --notes-file artifacts/release/release-notes.md \
+            --latest

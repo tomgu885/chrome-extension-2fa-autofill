@@ -1,8 +1,8 @@
 # 本地验证器：安装
 
-**[下载 v1.0.0 安装包（无需登录 GitHub）](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/download/v1.0.0/local-authenticator-1.0.0.zip)**，或查看 [最新正式版](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest)。安装无需 Node.js。请选择 Releases 的「Assets」中的 `local-authenticator-1.0.0.zip`；「Source code」和仓库「Code → Download ZIP」提供的是源码，需按 [README.md](README.md) 构建后才能加载。
+**[下载最新正式版安装包（无需登录 GitHub）](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest/download/local-authenticator.zip)**，或查看 [最新正式版](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest)。此直链会随版本 tag 自动发布新正式版而更新。安装无需 Node.js。请选择 Releases 的「Assets」中的 `local-authenticator.zip` 或带版本号的安装包；「Source code」和仓库「Code → Download ZIP」提供的是源码，需按 [README.md](README.md) 构建后才能加载。
 
-1. 解压 `local-authenticator-1.0.0.zip` 到一个准备长期保留的文件夹。
+1. 解压 `local-authenticator.zip` 到一个准备长期保留的文件夹。
 2. 在 Chrome 地址栏打开 `chrome://extensions`。
 3. 打开右上角「开发者模式」，点击「加载已解压的扩展程序」。
 4. 选择包含 `manifest.json` 的文件夹，将「本地验证器」固定到工具栏。

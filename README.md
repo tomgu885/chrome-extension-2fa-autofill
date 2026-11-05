@@ -10,13 +10,13 @@
 
 ### 方式一：使用已构建的安装包
 
-**[下载 v1.0.0 安装包（ZIP，无需登录 GitHub）](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/download/v1.0.0/local-authenticator-1.0.0.zip)** · [查看最新正式版](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest)
+**[下载最新正式版安装包（ZIP，无需登录 GitHub）](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest/download/local-authenticator.zip)** · [查看最新正式版](https://github.com/tomgu885/chrome-extension-2fa-autofill/releases/latest)
 
-安装包通过 GitHub Releases 提供，无需在本机安装 Node.js 或 Git，也不受 Actions 构建产物 30 天保留期限制。请下载发布页面 **Assets** 中的 `local-authenticator-1.0.0.zip`，不要选择自动生成的 **Source code (zip)** 或 **Source code (tar.gz)**，它们是需要构建的源码包。
+安装包通过 GitHub Releases 提供，无需在本机安装 Node.js 或 Git，也不受 Actions 构建产物 30 天保留期限制。上方直链自动跟随最新正式版。发布页面 **Assets** 同时提供 `local-authenticator.zip` 和带版本号的 ZIP，两者内容一致。不要选择自动生成的 **Source code (zip)** 或 **Source code (tar.gz)**，它们是需要构建的源码包。
 
 下载后按以下步骤安装：
 
-1. 将安装包解压到一个准备长期保留的文件夹。
+1. 将 `local-authenticator.zip` 安装包解压到一个准备长期保留的文件夹。
 2. 在 Chrome 地址栏输入 `chrome://extensions` 并打开。
 3. 打开右上角的「开发者模式」。
 4. 点击「加载已解压的扩展程序」，选择解压后**直接包含 `manifest.json`** 的文件夹。
@@ -46,7 +46,7 @@ npm run build
 npm run package
 ```
 
-输出文件为 `artifacts/local-authenticator-1.0.0.zip`。**GitHub 的 Download ZIP 是源码包，与这个已构建安装包不同；源码需要构建后才能安装。** 打包命令需要系统提供 `zip`；没有该命令时仍可直接加载 `dist/`，或手动压缩其中的文件。
+输出文件为 `artifacts/local-authenticator-<版本号>.zip`，版本号取自 `package.json`。**GitHub 的 Download ZIP 是源码包，与这个已构建安装包不同；源码需要构建后才能安装。** 打包命令需要系统提供 `zip`；没有该命令时仍可直接加载 `dist/`，或手动压缩其中的文件。
 
 ### 通过 GitHub 自动打包
 
@@ -54,9 +54,31 @@ npm run package
 
 流程依次安装依赖、执行核心测试与类型检查、构建扩展、在隔离的无头 Chromium 中执行端到端测试，全部通过后生成并上传可安装 ZIP。打包名称从 `package.json` 读取版本，并检查它与构建后的 `manifest.json` 一致。安装包直接包含 `manifest.json` 等文件，解压一次即可加载。
 
-GitHub 执行构建和测试，无需 Chrome Web Store 发布，也无需配置任何账号密钥或 Secrets。工作流仅申请仓库内容读取权限。普通用户安装推荐使用上方的 GitHub Releases 正式版。
+GitHub 执行构建和测试，无需 Chrome Web Store 发布，也无需配置个人 Token 或自定义 Secrets。构建任务仅申请仓库内容读取权限；tag 发布任务使用 GitHub 内置令牌读取本次构建产物并发布 Release。普通用户安装推荐使用上方的 GitHub Releases 正式版。
 
-如需测试分支的最新构建，可打开 [GitHub Actions 打包页面](https://github.com/tomgu885/chrome-extension-2fa-autofill/actions/workflows/package.yml)，选择最近一次成功运行，在底部 **Artifacts** 下载 ZIP；此入口需要登录 GitHub，构建产物保留 30 天。仓库有写入权限的用户也可点击 **Run workflow** 手动打包。Actions 工作流不会自动发布或覆盖 Releases。
+如需测试分支的最新构建，可打开 [GitHub Actions 打包页面](https://github.com/tomgu885/chrome-extension-2fa-autofill/actions/workflows/package.yml)，选择最近一次成功运行，在底部 **Artifacts** 下载 ZIP；此入口需要登录 GitHub，构建产物保留 30 天。仓库有写入权限的用户也可点击 **Run workflow** 手动打包。分支推送和手动打包仅生成构建产物；正式版发布由版本 tag 推送触发。
+
+### 推送版本 tag，自动发布正式版
+
+维护者发布新版本时：
+
+1. 同步更新 `package.json`、`package-lock.json` 和 `src/manifest.json` 的版本号，并提交、推送版本改动。例如使用 `npm version 1.0.1 --no-git-tag-version` 更新 npm 文件，再将 manifest 版本改为 `1.0.1`。
+2. 在包含版本改动及本工作流的提交上创建并推送 tag：
+
+```sh
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+上面的 `1.0.1` 是示例，请替换为本次实际版本。tag 必须采用 `vX.Y.Z` 格式，并与 package 和 manifest 中的版本完全一致；不匹配时构建会终止。当前流程用于稳定版本，不发布带 `-beta` 等后缀的预发布版本。
+
+工作流先完成测试、类型检查、构建、Chromium 端到端测试和 ZIP 完整性检查，再下载并核对同一次运行的构建产物，自动创建对应 tag 的 GitHub Release，附上：
+
+- `local-authenticator-<版本号>.zip`：固定版本安装包。
+- `local-authenticator.zip`：与固定版本包内容一致，用于 README 的最新版本直链。
+- `SHA256SUMS.txt`：两个安装包的 SHA-256 校验值。
+
+发布完成后，该 Release 标记为最新正式版，README 与安装说明中的 `releases/latest/download/local-authenticator.zip` 会自动指向新版本，无需再次修改文档或提交机器人改动。工作流不会覆盖已有 Release；已发布的版本请使用新的版本号继续发布。
 
 ## 使用
 
