@@ -3,13 +3,12 @@
   "name": "本地验证器 · Local Authenticator",
   "version": "1.0.2",
   "minimum_chrome_version": "120",
-  "description": "本地 TOTP 验证器：无限账号、自动填充、二维码导入、本地加密备份。所有功能免费开放。",
+  "description": "本地 TOTP 验证器：无限账号、自动填充、TOTP 链接导入、本地加密备份。所有功能免费开放。",
   "permissions": [
     "storage",
     "unlimitedStorage",
     "activeTab",
     "scripting",
-    "contextMenus",
     "clipboardWrite"
   ],
   "optional_host_permissions": [

@@ -3,7 +3,6 @@ import { mkdtemp, cp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
-import QRCode from 'qrcode';
 import { generateTOTP } from '../src/totp.js';
 import { validateAccount } from '../src/model.js';
 
@@ -14,15 +13,16 @@ const artifacts = `${root}artifacts`;
 await mkdir(artifacts, { recursive: true });
 await cp(`${root}dist`, extension, { recursive: true });
 const manifest = JSON.parse(await readFile(`${extension}/manifest.json`, 'utf8'));
-// This isolated copy pre-grants the local fixture origin and the screenshot
-// capability (<all_urls> substitutes for a native context-menu activeTab grant).
-// Production has neither: it requires site grants / native menu invocation.
-manifest.host_permissions = ['http://127.0.0.1/*', '<all_urls>'];
+// Only this isolated test copy pre-grants the local login fixture origin.
+// Production requires a user grant for each website.
+manifest.host_permissions = ['http://127.0.0.1/*'];
 await writeFile(`${extension}/manifest.json`, JSON.stringify(manifest));
 const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 const PASSWORD = 'public-e2e-passphrase-only';
-const otpURI = `otpauth://totp/QR%20Fixture:qr%40example.com?secret=${SECRET}&issuer=QR%20Fixture`;
-await QRCode.toFile(`${temporary}/qr.png`, otpURI, { width: 420, margin: 4 });
+const otpURI = new URL('otpauth://totp/MyAdmin:admin');
+otpURI.searchParams.set('secret', SECRET);
+otpURI.searchParams.set('issuer', 'MyAdmin');
+const migrationURIs = [];
 const vi = n => { const output = []; do { output.push((n & 127) | (n > 127 ? 128 : 0)); n >>>= 7; } while (n); return output; };
 const integer = (field, n) => [...vi(field * 8), ...vi(n)];
 const bytes = (field, value) => [...vi(field * 8 + 2), ...vi(value.length), ...value];
@@ -30,18 +30,15 @@ for (const index of [0, 1]) {
   const account = [...bytes(1, [...new TextEncoder().encode('12345678901234567890')]), ...bytes(2, [...new TextEncoder().encode(`migration-${index}@example.com`)]), ...bytes(3, [...new TextEncoder().encode('Google migration fixture')]), ...integer(4, 1), ...integer(5, 1), ...integer(6, 2)];
   const payload = [...bytes(1, account), ...integer(2, 1), ...integer(3, 2), ...integer(4, index), ...integer(5, 9821)];
   const uri = `otpauth-migration://offline?data=${encodeURIComponent(Buffer.from(payload).toString('base64'))}`;
-  await QRCode.toFile(`${temporary}/migration-${index}.png`, uri, { width: 600, margin: 4 });
+  migrationURIs.push(uri);
 }
-const qrImage = await readFile(`${temporary}/qr.png`);
 const input = '<label>验证码<input id="otp" autocomplete="one-time-code" inputmode="numeric" maxlength="6"></label>';
 let privacyProbeRequests = 0;
 const server = http.createServer((req, res) => {
   if (req.url === '/privacy-probe') { privacyProbeRequests++; res.writeHead(200).end('public probe'); return; }
-  if (req.url === '/qr.png') { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(qrImage); return; }
   if (req.url === '/favicon.ico') { res.writeHead(204).end(); return; }
   let html = '';
-  if (req.url === '/qr') html = '<h1>Synthetic QR fixture</h1><img src="/qr.png" alt="Test TOTP QR">';
-  else if (req.url === '/split') html = '<input type="email" name="email" value="alice@example.com"><fieldset>' + Array.from({ length: 6 }, (_, i) => `<input aria-label="Digit ${i + 1}" inputmode="numeric" maxlength="1">`).join('') + '</fieldset>';
+  if (req.url === '/split') html = '<input type="email" name="email" value="alice@example.com"><fieldset>' + Array.from({ length: 6 }, (_, i) => `<input aria-label="Digit ${i + 1}" inputmode="numeric" maxlength="1">`).join('') + '</fieldset>';
   else if (req.url === '/step1') html = '<form action="/step2"><input name="username" autocomplete="username"><button>Next</button></form>';
   else if (req.url === '/step2') html = input;
   else if (req.url === '/dynamic') html = '<input type="email" name="email" value="alice@example.com"><button id="reveal" onclick="document.querySelector(\'main\').innerHTML=\'' + input.replaceAll('"', '&quot;') + '\'">Reveal</button><main></main>';
@@ -146,23 +143,32 @@ try {
 
   await ui.bringToFront();
   await ui.getByRole('button', { name: '导入', exact: true }).click();
-  await ui.locator('#qr-files').setInputFiles(`${temporary}/qr.png`);
+  verify(await ui.locator('#qr-files, .upload-zone').count() === 0, 'QR image controls are still present');
+  await ui.locator('#import-text').fill(otpURI.toString());
+  await ui.locator('#parse-import').click();
   await ui.locator('#import-preview').waitFor({ state: 'visible' });
-  verify(await ui.locator('#import-accounts li').count() === 1, 'Local QR decode failed');
+  verify(await ui.locator('#import-accounts li').count() === 1, 'TOTP link did not produce an import preview');
+  verify((await ui.locator('#import-accounts').textContent()).includes('MyAdmin') && (await ui.locator('#import-accounts').textContent()).includes('admin'), 'TOTP issuer or username was parsed incorrectly');
+  await ui.locator('#import-folder').fill('链接测试');
+  await ui.locator('#import-domains').fill('127.0.0.1');
   await ui.locator('#confirm-import').click();
   await ui.waitForFunction(() => document.querySelector('#count')?.textContent === '2');
-  checks.push('actual local image upload, jsQR decode, preview, import');
+  const linked = (await call('STATE')).vault.accounts.find(x => x.username === 'admin');
+  verify(linked?.issuer === 'MyAdmin' && linked.domains.includes('127.0.0.1') && linked.folder === '链接测试', 'TOTP link did not preserve account and site metadata');
+  checks.push('otpauth totp issuer:username link input, preview, confirmation, and persisted account');
 
   await ui.getByRole('button', { name: '导入', exact: true }).click();
-  await ui.locator('#qr-files').setInputFiles(`${temporary}/migration-0.png`);
+  await ui.locator('#import-text').fill(migrationURIs[0]);
+  await ui.locator('#parse-import').click();
   await ui.waitForFunction(() => document.querySelector('#batch-status').textContent.includes('1 / 2'));
   verify(await ui.locator('#confirm-import').isDisabled(), 'Partial Google migration was allowed to import');
-  await ui.locator('#qr-files').setInputFiles(`${temporary}/migration-1.png`);
+  await ui.locator('#import-text').fill(migrationURIs[1]);
+  await ui.locator('#parse-import').click();
   await ui.waitForFunction(() => document.querySelector('#batch-status').textContent.includes('2 / 2'));
   verify(await ui.locator('#confirm-import').isEnabled(), 'Complete Google migration remained blocked');
   await ui.locator('#confirm-import').click();
   await ui.waitForFunction(() => document.querySelector('#count')?.textContent === '4');
-  checks.push('Google migration QR batch waits for all parts and imports all accounts');
+  checks.push('Google migration text-link batch waits for all parts and imports all accounts');
 
   const encrypted = await call('BACKUP', { passphrase: PASSWORD });
   verify(!JSON.stringify(encrypted).includes(SECRET), 'Backup leaked a plaintext secret');
@@ -170,7 +176,7 @@ try {
   const bad = await ui.evaluate(async ({ encrypted, PASSWORD }) => chrome.runtime.sendMessage({ type: 'RESTORE', envelope: encrypted, passphrase: PASSWORD + 'wrong' }), { encrypted, PASSWORD });
   verify(!bad.ok, 'Wrong backup password was accepted');
   verify((await call('STATE')).vault.accounts.length === before, 'Failed restore mutated the vault');
-  const id = (await call('STATE')).vault.accounts.find(x => x.username === 'qr@example.com').id;
+  const id = (await call('STATE')).vault.accounts.find(x => x.username === 'admin').id;
   await call('DELETE', { id });
   verify((await call('RESTORE', { envelope: encrypted, passphrase: PASSWORD })).added === 1, 'Restore failed to merge missing account');
   await ui.getByRole('button', { name: '本地备份', exact: true }).click();
@@ -199,21 +205,10 @@ try {
   verify(networkGuard.rejected && networkGuard.directive === 'connect-src' && privacyProbeRequests === 0, 'Extension CSP allowed a network POST');
   checks.push('connect-src none blocks an extension-page network POST before reaching the server');
 
-  await login.bringToFront(); await login.goto(`${address}/qr`);
-  const screenshot = await worker.evaluate(async () => {
-    const tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
-    return chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
-  });
-  await worker.evaluate(async image => {
-    await chrome.storage.session.set({ 'capture.fixture': { image, host: '127.0.0.1' } });
-  }, screenshot);
-  const scanner = await context.newPage();
-  await scanner.goto(`chrome-extension://${extensionId}/popup.html?capture=fixture`);
-  await scanner.locator('#import-preview').waitFor({ state: 'visible' });
-  verify((await scanner.locator('#import-domains').inputValue()) === '127.0.0.1', 'Capture lost source hostname');
-  const consumed = await worker.evaluate(() => chrome.storage.session.get('capture.fixture'));
-  verify(!consumed['capture.fixture'], 'Consumed screenshot was retained');
-  checks.push('real captureVisibleTab → screenshot QR decode → import preview');
+  verify(!manifest.permissions.includes('contextMenus'), 'QR context-menu permission is still present');
+  const captureReply = await ui.evaluate(() => chrome.runtime.sendMessage({ type: 'CAPTURE', token: 'removed-fixture' }));
+  verify(captureReply?.ok === false, 'Removed screenshot import message was accepted');
+  checks.push('QR upload, screenshot import handler, and context-menu permission removed');
 
   // A content script cannot read local secrets or invoke privileged UI actions.
   await login.goto(`${address}/login`);
@@ -231,8 +226,8 @@ try {
   verify(errors.length === 0, 'Extension UI raised a page error');
   verify(await worker.evaluate(() => globalThis.__cloudApiCalls) === 0, 'Runtime touched Chrome cloud storage');
   checks.push('content storage isolation and privileged-message rejection');
-  checks.push('account operations, local QR capture, encrypted export/restore, and removed commands never access cloud storage');
-  await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host and screenshot permission pre-granted only in test copy; no real Google account, native host-permission dialog, or native context-menu click' }, null, 2));
+  checks.push('account operations, TOTP link import, encrypted export/restore, and removed commands never access cloud storage');
+  await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host pre-granted only in test copy; no real account or native host-permission dialog' }, null, 2));
   console.log(`Passed ${checks.length} extension E2E checks. Evidence: artifacts/e2e-results.json`);
 } finally {
   if (context) await context.close();

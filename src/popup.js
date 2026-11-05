@@ -1,7 +1,6 @@
 import { validateAccount, normalizeHost } from './model.js';
 import { generateTOTP } from './totp.js';
 import { parseImport } from './import.js';
-import { readQRImages } from './qr.js';
 
 const $ = selector => document.querySelector(selector);
 /** @returns {NodeListOf<HTMLElement>} */
@@ -145,16 +144,10 @@ function pendingAccounts() { return [...imported, ...[...batches.values()].flatM
 function renderImport() {
   const accounts = pendingAccounts(); $('#import-preview').hidden = !accounts.length;
   $('#import-accounts').replaceChildren(...accounts.map(x => { const row = element('li', '', x.issuer || 'TOTP 账号'); row.append(element('span', '', x.username)); return row; }));
-  $('#batch-status').textContent = [...batches.values()].map(b => `Google 迁移：已读取 ${b.parts.size} / ${b.size} 张`).join('；') || `已读取 ${accounts.length} 个账号`;
+  $('#batch-status').textContent = [...batches.values()].map(b => `Google 迁移：已读取 ${b.parts.size} / ${b.size} 份链接`).join('；') || `已读取 ${accounts.length} 个账号`;
   $('#confirm-import').disabled = [...batches.values()].some(b => b.parts.size !== b.size);
 }
-function clearImport() { imported = []; batches = new Map(); $('#import-text').value = ''; $('#qr-files').value = ''; renderImport(); }
-async function parseImages(files) {
-  for (const file of files) {
-    for (const text of await readQRImages(file)) acceptImport(text);
-    renderImport();
-  }
-}
+function clearImport() { imported = []; batches = new Map(); $('#import-text').value = ''; renderImport(); }
 $$('nav button').forEach(node => node.addEventListener('click', () => switchView(node.dataset.view)));
 $$('[data-go]').forEach(node => node.addEventListener('click', () => switchView(node.dataset.go)));
 $('#add-account').addEventListener('click', () => openEditor());
@@ -165,9 +158,8 @@ document.addEventListener('keydown', event => { if (event.key === '/' && !['INPU
 action('#expand', () => chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') }));
 action('#parse-import', async () => { acceptImport($('#import-text').value); $('#import-text').value = ''; renderImport(); });
 action('#clear-import', async () => clearImport());
-$('#qr-files').addEventListener('change', async event => { try { await parseImages(event.target.files); } catch (error) { toast(safeError(error), true); } finally { event.target.value = ''; } });
 action('#confirm-import', async () => {
-  if ([...batches.values()].some(b => b.parts.size !== b.size)) throw new Error('请先添加此批次的全部二维码。');
+  if ([...batches.values()].some(b => b.parts.size !== b.size)) throw new Error('请先添加此批次的全部迁移链接。');
   const domains = $('#import-domains').value.split(/[,，]/).map(x => x.trim()).filter(Boolean).map(normalizeHost);
   const accounts = pendingAccounts().map(x => ({ ...x, folder: $('#import-folder').value.trim(), domains }));
   const result = await request('IMPORT', { accounts }); clearImport(); await refresh(); switchView('accounts'); toast(`已导入 ${result.added} 个账号，重复项已跳过`);
@@ -204,14 +196,6 @@ async function init() {
   [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (currentTab?.url && /^https?:/.test(currentTab.url)) {
     const url = new URL(currentTab.url); $('#current-site').textContent = url.hostname; $('#enable-site').disabled = false;
-  }
-  const params = new URLSearchParams(location.search);
-  if (params.has('captureError')) { switchView('import'); toast('当前页面无法截图，请上传二维码图片。', true); }
-  if (params.has('capture')) {
-    switchView('import'); const capture = await request('CAPTURE', { token: params.get('capture') });
-    $('#import-domains').value = capture.host;
-    const image = new Blob([Uint8Array.from(atob(capture.image.split(',')[1]), char => char.charCodeAt(0))], { type: 'image/png' });
-    await parseImages([image]);
   }
   setInterval(() => { tick().catch(() => {}); }, 1000);
 }

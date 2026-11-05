@@ -12,18 +12,16 @@
         <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="搜索账号、服务或标签" aria-label="搜索账号、服务或标签"><kbd>/</kbd></label>
         <div id="folders" class="filters" aria-label="文件夹"></div>
         <div id="account-list" aria-live="polite"></div>
-        <div id="empty" class="empty"><div class="empty-icon">⌁</div><h3>让登录更简单</h3><p>添加你的第一个 TOTP 账号，<br>验证码就会在这里自动更新。</p><button id="empty-add" class="primary">添加账号</button><button data-go="import" class="text-button">从二维码导入 →</button></div>
+        <div id="empty" class="empty"><div class="empty-icon">⌁</div><h3>让登录更简单</h3><p>添加你的第一个 TOTP 账号，<br>验证码就会在这里自动更新。</p><button id="empty-add" class="primary">添加账号</button><button data-go="import" class="text-button">从链接导入 →</button></div>
         <div class="site-panel"><div><span class="eyebrow">当前网站</span><p id="current-site">请在登录网站打开扩展</p></div><button id="enable-site" class="secondary small" disabled>启用填充</button></div>
         <p class="hint">只在授权网站且账号唯一匹配时填充，不自动提交表单。</p>
       </section>
       <section id="import-view" class="view" hidden>
-        <h2>把账号带过来</h2><p class="description">支持 TOTP 二维码、Google Authenticator 迁移二维码，以及 otpauth 链接。</p>
-        <label class="upload-zone"><span class="upload-symbol">▧</span><strong>选择二维码图片</strong><span>可多选 · PNG / JPG / WebP</span><input id="qr-files" type="file" accept="image/png,image/jpeg,image/webp" multiple></label>
-        <div class="divider">或粘贴链接</div>
-        <label class="field">TOTP / 迁移链接<textarea id="import-text" rows="3" placeholder="otpauth://totp/…" autocomplete="off" spellcheck="false"></textarea></label>
+        <h2>把账号带过来</h2><p class="description">粘贴 TOTP 设置链接或 Google Authenticator 迁移链接，在本机读取并确认账号。</p>
+        <label class="field">账号设置链接<textarea id="import-text" rows="3" placeholder="otpauth://totp/…" autocomplete="off" spellcheck="false"></textarea></label>
         <button id="parse-import" class="secondary">读取链接</button>
         <div id="import-preview" hidden><div class="section-heading"><h3>待导入账号</h3><button id="clear-import" class="text-button">清空</button></div><p id="batch-status" class="hint"></p><ul id="import-accounts" class="preview-list"></ul><label class="field">文件夹（可选）<input id="import-folder" placeholder="例如：工作 / 客户 A"></label><label class="field">登录网站（可选，逗号分隔）<input id="import-domains" placeholder="例如：github.com, login.example.com"></label><button id="confirm-import" class="primary full">确认导入</button></div>
-        <div class="note">在网页二维码上点右键，选择“添加此处的 2FA 二维码”即可扫描当前画面。Google 迁移有多张二维码时，请全部添加后确认。</div>
+        <div class="note">支持 otpauth://totp 链接，每行一个。点击“读取链接”后核对服务和用户名，再确认导入；读取链接不会访问网站或上传内容。</div>
       </section>
       <section id="backup-view" class="view" hidden>
         <h2>本地加密备份</h2><p class="description">在本机用口令加密并下载，不上传服务器。请记住口令，无法找回。</p>

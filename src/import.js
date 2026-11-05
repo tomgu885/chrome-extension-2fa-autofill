@@ -21,27 +21,27 @@ function protobuf(bytes) {
   function varint() {
     let value = 0n, shift = 0n;
     for (let i = 0; i < 10; i++) {
-      if (pos >= bytes.length) throw new Error('迁移二维码数据不完整。');
+      if (pos >= bytes.length) throw new Error('迁移链接数据不完整。');
       const byte = bytes[pos++]; value |= BigInt(byte & 127) << shift;
       if (!(byte & 128)) return value;
       shift += 7n;
     }
-    throw new Error('迁移二维码格式无效。');
+    throw new Error('迁移链接格式无效。');
   }
   while (pos < bytes.length) {
     const tag = Number(varint()), field = tag >>> 3, wire = tag & 7;
-    if (!field) throw new Error('迁移二维码格式无效。');
+    if (!field) throw new Error('迁移链接格式无效。');
     let value;
     if (wire === 0) value = Number(BigInt.asIntN(32, varint()));
     else if (wire === 2) {
       const length = Number(varint());
-      if (length > bytes.length - pos) throw new Error('迁移二维码数据不完整。');
+      if (length > bytes.length - pos) throw new Error('迁移链接数据不完整。');
       value = bytes.slice(pos, pos + length); pos += length;
     } else if (wire === 1 || wire === 5) {
       pos += wire === 1 ? 8 : 4;
-      if (pos > bytes.length) throw new Error('迁移二维码数据不完整。');
+      if (pos > bytes.length) throw new Error('迁移链接数据不完整。');
       continue;
-    } else throw new Error('迁移二维码格式无效。');
+    } else throw new Error('迁移链接格式无效。');
     fields.set(field, [...(fields.get(field) ?? []), value]);
   }
   return fields;
@@ -49,9 +49,9 @@ function protobuf(bytes) {
 
 export function parseMigration(text) {
   const url = new URL(text.trim());
-  if (url.protocol !== 'otpauth-migration:' || url.hostname !== 'offline') throw new Error('迁移二维码格式无效。');
+  if (url.protocol !== 'otpauth-migration:' || url.hostname !== 'offline') throw new Error('迁移链接格式无效。');
   const data = url.searchParams.get('data');
-  if (!data || data.length > 2_000_000) throw new Error('迁移二维码格式无效。');
+  if (!data || data.length > 2_000_000) throw new Error('迁移链接格式无效。');
   const payload = protobuf(Uint8Array.from(atob(data.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
   const get = (map, key, fallback) => map.get(key)?.[0] ?? fallback;
   if (get(payload, 2, 1) !== 1) throw new Error('不支持此 Google Authenticator 迁移版本。');
@@ -73,6 +73,6 @@ export function parseMigration(text) {
 export function parseImport(text) {
   if (text.trim().startsWith('otpauth-migration:')) return parseMigration(text);
   const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
-  if (!lines.length) throw new Error('请提供 TOTP URI 或二维码。');
+  if (!lines.length) throw new Error('请提供 TOTP 设置链接。');
   return { accounts: lines.map(parseOTPAuth), batch: null };
 }

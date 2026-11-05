@@ -14,7 +14,7 @@ await writeFile(join(directory, 'release-notes.md'), `本地验证器 v${version
 
 下载 Assets 中的 \`local-authenticator.zip\` 或 \`${filename}\`，解压后在 Chrome 的 \`chrome://extensions\` 开启开发者模式，选择「加载已解压的扩展程序」并选中包含 \`manifest.json\` 的目录。无需登录 GitHub，无需 Chrome Web Store 或 Node.js。
 
-本扩展仅在本机保存账号、生成验证码和解析二维码，保留本地加密备份导出/恢复，不提供 Chrome 云同步。扩展不会上传 seed 或含 seed 的加密账号库，扩展页面和后台禁止网络连接。请通过本地加密备份文件迁移账号。
+本扩展仅在本机保存账号、生成验证码和读取 TOTP 设置链接，保留本地加密备份导出/恢复，不提供 Chrome 云同步。扩展不会上传 seed 或含 seed 的加密账号库，扩展页面和后台禁止网络连接。请通过本地加密备份文件迁移账号。
 
 从旧版升级会保留本地账号；旧版已上传的云端密文不会因本次升级自动删除，其他仍在使用旧版的设备应一并升级。
 

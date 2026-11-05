@@ -61,6 +61,22 @@ test('otpauth import supports issuer, custom parameters, unicode and rejects HOT
   assert.throws(() => parseImport('https://example.com'));
 });
 
+test('totp issuer:username links support a 16-character Base32 key and default parameters', async () => {
+  const secret = encodeBase32(new TextEncoder().encode('1234567890'));
+  const uri = new URL('otpauth://totp/MyAdmin:admin');
+  uri.searchParams.set('secret', secret);
+  uri.searchParams.set('issuer', 'MyAdmin');
+  const { accounts } = parseImport(uri.toString());
+  assert.equal(accounts.length, 1);
+  assert.equal(accounts[0].issuer, 'MyAdmin');
+  assert.equal(accounts[0].username, 'admin');
+  assert.equal(accounts[0].digits, 6);
+  assert.equal(accounts[0].period, 30);
+  assert.equal(accounts[0].algorithm, 'SHA1');
+  assert.ok(accounts[0].secret === secret);
+  assert.match(await generateTOTP(accounts[0]), /^\d{6}$/);
+});
+
 const variable = n => { const result = []; let v = BigInt(n); do { const byte = Number(v & 127n); v >>= 7n; result.push(byte | (v ? 128 : 0)); } while (v); return result; };
 const int = (key, value) => [...variable(key * 8), ...variable(BigInt.asUintN(64, BigInt(value)))];
 const data = (key, value) => [...variable(key * 8 + 2), ...variable(value.length), ...value];

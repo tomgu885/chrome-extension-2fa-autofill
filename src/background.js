@@ -29,32 +29,12 @@ function registerSites() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.removeAll(() => chrome.contextMenus.create({ id: 'scan-qr', title: '添加此处的 2FA 二维码', contexts: ['all'], documentUrlPatterns: ['https://*/*', 'http://*/*'] }));
   void registerSites();
 });
 chrome.runtime.onStartup.addListener(() => { void registerSites(); });
 chrome.permissions.onAdded.addListener(() => { void registerSites(); });
 chrome.permissions.onRemoved.addListener(() => { void registerSites(); });
 chrome.tabs.onRemoved.addListener(tabId => { void chrome.storage.session.remove(`login.${tabId}`); });
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== 'scan-qr' || !tab?.id) return;
-  void (async () => {
-    await ready;
-    // Capture the visible page locally, including canvas and cross-origin images.
-    // No QR image URL or secret is fetched or transmitted to a server.
-    try {
-      const active = await chrome.tabs.get(tab.id);
-      if (!active.active) throw new Error('请在当前标签页重试。');
-      const image = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
-      const token = crypto.randomUUID();
-      await chrome.storage.session.set({ [`capture.${token}`]: { image, host: new URL(tab.url).hostname } });
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`popup.html?capture=${token}`) });
-    } catch {
-      await chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?captureError=1') });
-    }
-  })();
-});
 
 async function handleContent(message, sender) {
   if (!sender.tab?.id || !sender.url) throw new Error('无效的页面请求。');
@@ -113,13 +93,6 @@ async function handleUI(message) {
       await saveVault({ version: 1, accounts: result.accounts }); return { added: result.added };
     }
     case 'REGISTER': await registerSites(); return null;
-    case 'CAPTURE': {
-      const key = `capture.${message.token}`;
-      const capture = (await chrome.storage.session.get(key))[key];
-      await chrome.storage.session.remove(key);
-      if (!capture) throw new Error('截图已过期，请重新右键扫描。');
-      return capture;
-    }
     default: throw new Error('不支持的操作。');
   }
 }
