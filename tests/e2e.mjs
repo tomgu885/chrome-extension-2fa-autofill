@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import QRCode from 'qrcode';
 import { mkdtemp, cp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -143,7 +144,6 @@ try {
 
   await ui.bringToFront();
   await ui.getByRole('button', { name: '导入', exact: true }).click();
-  verify(await ui.locator('#qr-files, .upload-zone').count() === 0, 'QR image controls are still present');
   await ui.locator('#import-text').fill(otpURI.toString());
   await ui.locator('#parse-import').click();
   await ui.locator('#import-preview').waitFor({ state: 'visible' });
@@ -169,6 +169,76 @@ try {
   await ui.locator('#confirm-import').click();
   await ui.waitForFunction(() => document.querySelector('#count')?.textContent === '4');
   checks.push('Google migration text-link batch waits for all parts and imports all accounts');
+
+  const imageURI = username => {
+    const uri = new URL(otpURI); uri.pathname = `/Image fixture:${username}`;
+    uri.searchParams.set('issuer', 'Image fixture'); return uri.toString();
+  };
+  const uploadedPNG = await QRCode.toBuffer(imageURI('upload@example.invalid'), { width: 640, color: { light: '#00000000' } });
+  await ui.getByRole('button', { name: '导入', exact: true }).click();
+  await ui.locator('#qr-files').setInputFiles({ name: 'transparent-qr.png', mimeType: 'image/png', buffer: uploadedPNG });
+  await ui.waitForFunction(() => document.querySelector('#image-status').textContent.includes('图片已读取'));
+  verify((await ui.locator('#import-accounts').textContent()).includes('upload@example.invalid'), 'Uploaded transparent QR did not decode');
+  verify((await call('STATE')).vault.accounts.length === 4, 'Image upload saved accounts before confirmation');
+  await ui.locator('#confirm-import').click();
+  await ui.waitForFunction(() => document.querySelector('#count').textContent === '5');
+  checks.push('local image upload decodes transparent QR, previews metadata, and saves only after confirmation');
+
+  // Dispatch a clipboard event in the isolated browser; never read or change the OS clipboard.
+  const pastedPNG = await QRCode.toBuffer(imageURI('paste@example.invalid'), { width: 480 });
+  const pasteImage = async (bytes, embedded = false) => ui.evaluate(async ({ bytes, embedded }) => {
+    let file = new File([new Uint8Array(bytes)], 'clipboard.png', { type: 'image/png' });
+    if (embedded) {
+      const bitmap = await createImageBitmap(file), canvas = document.createElement('canvas');
+      canvas.width = 1100; canvas.height = 800;
+      const ctx = canvas.getContext('2d'); ctx.fillStyle = '#eee'; ctx.fillRect(0, 0, 1100, 800);
+      ctx.fillStyle = '#222'; ctx.font = '24px sans-serif'; ctx.fillText('Public QR image fixture', 60, 60);
+      ctx.drawImage(bitmap, 310, 180); bitmap.close();
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      file = new File([blob], 'clipboard-screenshot.png', { type: 'image/png' });
+    }
+    const data = new DataTransfer(); data.items.add(file);
+    const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true });
+    document.querySelector('#image-paste').dispatchEvent(event);
+    return event.defaultPrevented;
+  }, { bytes: [...bytes], embedded });
+  verify(!await pasteImage(pastedPNG), 'Image paste was intercepted outside the import view');
+  await ui.getByRole('button', { name: '导入', exact: true }).click();
+  await ui.screenshot({ path: `${artifacts}/image-import-desktop.png`, animations: 'disabled' });
+  const narrow = await context.newPage();
+  await narrow.setViewportSize({ width: 420, height: 800 });
+  await narrow.goto(`chrome-extension://${extensionId}/popup.html`);
+  await narrow.getByRole('button', { name: '导入', exact: true }).click();
+  await narrow.screenshot({ path: `${artifacts}/image-import-popup.png`, fullPage: true, animations: 'disabled' });
+  await narrow.close();
+  verify(await pasteImage(pastedPNG, true), 'Clipboard image was not intercepted in the import view');
+  await ui.waitForFunction(() => document.querySelector('#import-accounts').textContent.includes('paste@example.invalid'));
+  verify((await call('STATE')).vault.accounts.length === 5, 'Pasted image saved accounts before confirmation');
+  await ui.locator('#confirm-import').click();
+  await ui.waitForFunction(() => document.querySelector('#count').textContent === '6');
+  verify((await call('STATE')).vault.accounts.some(x => x.username === 'paste@example.invalid'), 'Pasted QR account did not persist');
+  checks.push('image paste event decodes QR embedded in a larger image; import view only and explicit confirmation');
+
+  await ui.getByRole('button', { name: '导入', exact: true }).click();
+  verify(await ui.evaluate(() => {
+    const data = new DataTransfer(); data.setData('text/plain', 'public-text');
+    const event = new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true });
+    document.querySelector('#import-text').dispatchEvent(event); return !event.defaultPrevented;
+  }), 'Text-only paste was intercepted');
+  const migrationPNGs = await Promise.all(migrationURIs.map(uri => QRCode.toBuffer(uri, { width: 640 })));
+  await ui.locator('#qr-files').setInputFiles(migrationPNGs.map((buffer, index) => ({ name: `migration-${index}.png`, mimeType: 'image/png', buffer })));
+  await ui.waitForFunction(() => document.querySelector('#batch-status').textContent.includes('2 / 2'));
+  verify(await ui.locator('#confirm-import').isEnabled(), 'Multiple migration image files did not complete their batch');
+  verify(await ui.locator('#import-accounts li').count() === 2, 'Migration QR image accounts missing');
+  await ui.locator('#clear-import').click();
+  const unsupportedPNG = await QRCode.toBuffer('https://example.invalid/public-fixture', { width: 480 });
+  await ui.locator('#qr-files').setInputFiles({ name: 'unsupported.png', mimeType: 'image/png', buffer: unsupportedPNG });
+  await ui.waitForFunction(() => document.querySelector('#image-status').textContent.includes('未找到 TOTP'));
+  verify((await call('STATE')).vault.accounts.length === 6 && await ui.locator('#import-preview').isHidden(), 'Unsupported QR changed the vault or preview');
+  await ui.locator('#qr-files').setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('public invalid image fixture') });
+  await ui.waitForFunction(() => document.querySelector('#image-status').textContent.includes('操作失败'));
+  verify(await ui.locator('#qr-files').isEnabled(), 'Image controls stayed disabled after a decode failure');
+  checks.push('multiple Google migration images, ordinary text paste, unsupported QR and corrupt-image rejection');
 
   const encrypted = await call('BACKUP', { passphrase: PASSWORD });
   verify(!JSON.stringify(encrypted).includes(SECRET), 'Backup leaked a plaintext secret');
@@ -208,7 +278,8 @@ try {
   verify(!manifest.permissions.includes('contextMenus'), 'QR context-menu permission is still present');
   const captureReply = await ui.evaluate(() => chrome.runtime.sendMessage({ type: 'CAPTURE', token: 'removed-fixture' }));
   verify(captureReply?.ok === false, 'Removed screenshot import message was accepted');
-  checks.push('QR upload, screenshot import handler, and context-menu permission removed');
+  verify(!manifest.permissions.includes('clipboardRead'), 'Image paste introduced broad clipboard-read permission');
+  checks.push('no clipboardRead or context-menu permission; removed page capture command rejected');
 
   // A content script cannot read local secrets or invoke privileged UI actions.
   await login.goto(`${address}/login`);
@@ -226,8 +297,8 @@ try {
   verify(errors.length === 0, 'Extension UI raised a page error');
   verify(await worker.evaluate(() => globalThis.__cloudApiCalls) === 0, 'Runtime touched Chrome cloud storage');
   checks.push('content storage isolation and privileged-message rejection');
-  checks.push('account operations, TOTP link import, encrypted export/restore, and removed commands never access cloud storage');
-  await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host pre-granted only in test copy; no real account or native host-permission dialog' }, null, 2));
+  checks.push('account operations, image/link import, encrypted export/restore, and removed commands never access cloud storage');
+  await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host pre-granted only in test copy; synthetic clipboard events only, no OS clipboard access, real account or native host-permission dialog' }, null, 2));
   console.log(`Passed ${checks.length} extension E2E checks. Evidence: artifacts/e2e-results.json`);
 } finally {
   if (context) await context.close();

@@ -17,11 +17,12 @@
         <p class="hint">只在授权网站且账号唯一匹配时填充，不自动提交表单。</p>
       </section>
       <section id="import-view" class="view" hidden>
-        <h2>把账号带过来</h2><p class="description">粘贴 TOTP 设置链接或 Google Authenticator 迁移链接，在本机读取并确认账号。</p>
+        <h2>把账号带过来</h2><p class="description">粘贴设置链接或二维码图片，也可选择本地图片。在本机读取，确认后保存。</p>
+        <div class="image-import"><div id="image-paste" tabindex="0" role="region" aria-label="粘贴二维码图片"><strong>粘贴二维码图片</strong><p>复制图片后，在此页按 ⌘V / Ctrl+V</p></div><label class="field">或选择二维码图片<input id="qr-files" type="file" accept="image/png,image/jpeg,image/webp" multiple></label><p id="image-status" class="hint" role="status" aria-live="polite">支持 PNG、JPEG、WebP，每张不超过 20 MB，可选择多张。</p></div>
         <label class="field">账号设置链接<textarea id="import-text" rows="3" placeholder="otpauth://totp/…" autocomplete="off" spellcheck="false"></textarea></label>
         <button id="parse-import" class="secondary">读取链接</button>
         <div id="import-preview" hidden><div class="section-heading"><h3>待导入账号</h3><button id="clear-import" class="text-button">清空</button></div><p id="batch-status" class="hint"></p><ul id="import-accounts" class="preview-list"></ul><label class="field">文件夹（可选）<input id="import-folder" placeholder="例如：工作 / 客户 A"></label><label class="field">登录网站（可选，逗号分隔）<input id="import-domains" placeholder="例如：github.com, login.example.com"></label><button id="confirm-import" class="primary full">确认导入</button></div>
-        <div class="note">支持 otpauth://totp 链接，每行一个。点击“读取链接”后核对服务和用户名，再确认导入；读取链接不会访问网站或上传内容。</div>
+        <div class="note">支持 TOTP 和 Google Authenticator 迁移二维码；多份迁移二维码需全部读入。也支持 otpauth://totp 链接，每行一个。图片与链接仅在本机解析，不会上传或打开其中的网址。</div>
       </section>
       <section id="backup-view" class="view" hidden>
         <h2>本地加密备份</h2><p class="description">在本机用口令加密并下载，不上传服务器。请记住口令，无法找回。</p>

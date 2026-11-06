@@ -1,12 +1,13 @@
 import { validateAccount, normalizeHost } from './model.js';
 import { generateTOTP } from './totp.js';
 import { parseImport } from './import.js';
+import { readQRImages } from './qr.js';
 
 const $ = selector => document.querySelector(selector);
 /** @returns {NodeListOf<HTMLElement>} */
 const $$ = selector => document.querySelectorAll(selector);
 let state, currentTab, folder = '', currentView = 'accounts', toastTimer;
-let imported = [], batches = new Map();
+let imported = [], batches = new Map(), imageBusy = false;
 const codeCache = new Map();
 async function request(type, data = {}) {
   const response = await chrome.runtime.sendMessage({ type, ...data });
@@ -145,9 +146,34 @@ function renderImport() {
   const accounts = pendingAccounts(); $('#import-preview').hidden = !accounts.length;
   $('#import-accounts').replaceChildren(...accounts.map(x => { const row = element('li', '', x.issuer || 'TOTP 账号'); row.append(element('span', '', x.username)); return row; }));
   $('#batch-status').textContent = [...batches.values()].map(b => `Google 迁移：已读取 ${b.parts.size} / ${b.size} 份链接`).join('；') || `已读取 ${accounts.length} 个账号`;
-  $('#confirm-import').disabled = [...batches.values()].some(b => b.parts.size !== b.size);
+  $('#confirm-import').disabled = imageBusy || [...batches.values()].some(b => b.parts.size !== b.size);
 }
-function clearImport() { imported = []; batches = new Map(); $('#import-text').value = ''; renderImport(); }
+function clearImport() {
+  imported = []; batches = new Map(); $('#import-text').value = '';
+  $('#image-status').textContent = '支持 PNG、JPEG、WebP，每张不超过 20 MB，可选择多张。'; renderImport();
+}
+async function importImages(files) {
+  if (imageBusy) return;
+  imageBusy = true;
+  for (const selector of ['#qr-files', '#parse-import', '#clear-import']) $(selector).disabled = true;
+  $('#image-status').textContent = '正在本机读取图片…'; renderImport();
+  try {
+    for (const file of files) for (const text of await readQRImages(file)) acceptImport(text);
+    $('#image-status').textContent = '图片已读取，请核对下方账号并确认导入。';
+  } catch (error) { $('#image-status').textContent = safeError(error); toast(safeError(error), true); }
+  finally {
+    imageBusy = false;
+    for (const selector of ['#qr-files', '#parse-import', '#clear-import']) $(selector).disabled = false;
+    $('#qr-files').value = ''; renderImport();
+  }
+}
+$('#qr-files').addEventListener('change', event => { void importImages([...event.target.files]); });
+document.addEventListener('paste', event => {
+  if (currentView !== 'import' || $('#account-dialog').open) return;
+  const files = [...(event.clipboardData?.files ?? [])].filter(file => file.type.startsWith('image/'));
+  if (!files.length) return;
+  event.preventDefault(); void importImages(files);
+});
 $$('nav button').forEach(node => node.addEventListener('click', () => switchView(node.dataset.view)));
 $$('[data-go]').forEach(node => node.addEventListener('click', () => switchView(node.dataset.go)));
 $('#add-account').addEventListener('click', () => openEditor());
