@@ -11,6 +11,7 @@
     "scripting",
     "clipboardWrite"
   ],
+  "optional_permissions": ["clipboardRead"],
   "optional_host_permissions": [
     "https://*/*",
     "http://*/*"

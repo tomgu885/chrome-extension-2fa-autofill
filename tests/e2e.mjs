@@ -144,7 +144,47 @@ try {
 
   await ui.bringToFront();
   await ui.getByRole('button', { name: '导入', exact: true }).click();
-  await ui.locator('#import-text').fill(otpURI.toString());
+  // Stub only the clipboard/permission boundary, without touching the OS clipboard.
+  await ui.evaluate(text => {
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    const originalRequest = chrome.permissions.request;
+    globalThis.__pasteMode = 'denied'; globalThis.__clipboardReads = 0;
+    chrome.permissions.request = async options => {
+      if (options.permissions?.join() !== 'clipboardRead') throw new Error('Unexpected permission request');
+      return globalThis.__pasteMode !== 'denied';
+    };
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      readText: async () => {
+        globalThis.__clipboardReads++;
+        if (globalThis.__pasteMode === 'failed') throw new DOMException('Public fixture failure', 'NotAllowedError');
+        return globalThis.__pasteMode === 'empty' ? '' : text;
+      },
+    } });
+    globalThis.__restoreClipboard = () => {
+      chrome.permissions.request = originalRequest;
+      if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor);
+      else delete navigator.clipboard;
+    };
+  }, otpURI.toString());
+  await ui.locator('#import-text').fill('public-existing-text');
+  await ui.locator('#paste-import').click();
+  await ui.waitForFunction(() => !document.querySelector('#paste-import').disabled);
+  verify(await ui.locator('#import-text').inputValue() === 'public-existing-text', 'Denied clipboard access changed the input');
+  verify(await ui.evaluate(() => globalThis.__clipboardReads) === 0, 'Clipboard read occurred without permission');
+  for (const mode of ['empty', 'failed']) {
+    await ui.evaluate(mode => { globalThis.__pasteMode = mode; }, mode);
+    await ui.locator('#paste-import').click();
+    await ui.waitForFunction(() => !document.querySelector('#paste-import').disabled);
+    verify(await ui.locator('#import-text').inputValue() === 'public-existing-text', 'Failed or empty clipboard read changed the input');
+  }
+  await ui.evaluate(() => { globalThis.__pasteMode = 'text'; });
+  await ui.locator('#paste-import').click();
+  await ui.waitForFunction(() => document.querySelector('#import-text').value.startsWith('otpauth://'));
+  verify(await ui.locator('#import-text').inputValue() === otpURI.toString(), 'Paste button did not fill the clipboard text exactly');
+  verify((await call('STATE')).vault.accounts.length === 1 && await ui.locator('#import-preview').isHidden(), 'Paste button parsed or saved an account automatically');
+  await ui.evaluate(() => globalThis.__restoreClipboard());
+  checks.push('text paste button fills input only after permission; denied, empty and failed reads preserve input (stubbed clipboard boundary)');
+
   await ui.locator('#parse-import').click();
   await ui.locator('#import-preview').waitFor({ state: 'visible' });
   verify(await ui.locator('#import-accounts li').count() === 1, 'TOTP link did not produce an import preview');
@@ -278,8 +318,9 @@ try {
   verify(!manifest.permissions.includes('contextMenus'), 'QR context-menu permission is still present');
   const captureReply = await ui.evaluate(() => chrome.runtime.sendMessage({ type: 'CAPTURE', token: 'removed-fixture' }));
   verify(captureReply?.ok === false, 'Removed screenshot import message was accepted');
-  verify(!manifest.permissions.includes('clipboardRead'), 'Image paste introduced broad clipboard-read permission');
-  checks.push('no clipboardRead or context-menu permission; removed page capture command rejected');
+  verify(!manifest.permissions.includes('clipboardRead'), 'Clipboard read permission was made mandatory');
+  verify(manifest.optional_permissions.includes('clipboardRead'), 'Paste button lacks its optional clipboard permission');
+  checks.push('clipboardRead remains optional, no context-menu permission; removed page capture command rejected');
 
   // A content script cannot read local secrets or invoke privileged UI actions.
   await login.goto(`${address}/login`);
@@ -298,7 +339,7 @@ try {
   verify(await worker.evaluate(() => globalThis.__cloudApiCalls) === 0, 'Runtime touched Chrome cloud storage');
   checks.push('content storage isolation and privileged-message rejection');
   checks.push('account operations, image/link import, encrypted export/restore, and removed commands never access cloud storage');
-  await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host pre-granted only in test copy; synthetic clipboard events only, no OS clipboard access, real account or native host-permission dialog' }, null, 2));
+  await writeFile(`${artifacts}/e2e-results.json`, JSON.stringify({ passed: true, checks, scope: 'isolated headless Chromium, public synthetic data; local fixture host pre-granted only in test copy; synthetic image paste events and stubbed text clipboard/permission boundary, no OS clipboard access, real account or native host-permission dialog' }, null, 2));
   console.log(`Passed ${checks.length} extension E2E checks. Evidence: artifacts/e2e-results.json`);
 } finally {
   if (context) await context.close();

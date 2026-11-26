@@ -155,7 +155,7 @@ function clearImport() {
 async function importImages(files) {
   if (imageBusy) return;
   imageBusy = true;
-  for (const selector of ['#qr-files', '#parse-import', '#clear-import']) $(selector).disabled = true;
+  for (const selector of ['#qr-files', '#parse-import', '#paste-import', '#clear-import']) $(selector).disabled = true;
   $('#image-status').textContent = '正在本机读取图片…'; renderImport();
   try {
     for (const file of files) for (const text of await readQRImages(file)) acceptImport(text);
@@ -163,7 +163,7 @@ async function importImages(files) {
   } catch (error) { $('#image-status').textContent = safeError(error); toast(safeError(error), true); }
   finally {
     imageBusy = false;
-    for (const selector of ['#qr-files', '#parse-import', '#clear-import']) $(selector).disabled = false;
+    for (const selector of ['#qr-files', '#parse-import', '#paste-import', '#clear-import']) $(selector).disabled = false;
     $('#qr-files').value = ''; renderImport();
   }
 }
@@ -183,6 +183,15 @@ $('#search').addEventListener('input', () => { void renderAccounts(); });
 document.addEventListener('keydown', event => { if (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && !$('#account-dialog').open) { event.preventDefault(); switchView('accounts'); $('#search').focus(); } });
 action('#expand', () => chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') }));
 action('#parse-import', async () => { acceptImport($('#import-text').value); $('#import-text').value = ''; renderImport(); });
+action('#paste-import', async () => {
+  const granted = await chrome.permissions.request({ permissions: ['clipboardRead'] });
+  if (!granted) throw new Error('未允许读取剪贴板，请使用 ⌘V / Ctrl+V 粘贴。');
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch { throw new Error('无法读取剪贴板，请使用 ⌘V / Ctrl+V 粘贴。'); }
+  if (!text.trim()) throw new Error('剪贴板中没有文本，请先复制账号设置链接。');
+  $('#import-text').value = text; $('#import-text').focus();
+});
 action('#clear-import', async () => clearImport());
 action('#confirm-import', async () => {
   if ([...batches.values()].some(b => b.parts.size !== b.size)) throw new Error('请先添加此批次的全部迁移链接。');
