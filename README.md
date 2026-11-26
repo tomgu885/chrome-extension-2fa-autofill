@@ -62,15 +62,15 @@ GitHub 执行构建和测试，无需 Chrome Web Store 发布，也无需配置�
 
 维护者发布新版本时：
 
-1. 同步更新 `package.json`、`package-lock.json` 和 `src/manifest.json` 的版本号，并提交、推送版本改动。例如使用 `npm version 1.0.3 --no-git-tag-version` 更新 npm 文件，再将 manifest 版本改为 `1.0.3`。
+1. 同步更新 `package.json`、`package-lock.json` 和 `src/manifest.json` 的版本号，并提交、推送版本改动。例如使用 `npm version 1.0.4 --no-git-tag-version` 更新 npm 文件，再将 manifest 版本改为 `1.0.4`。
 2. 在包含版本改动及本工作流的提交上创建并推送 tag：
 
 ```sh
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.0.4
+git push origin v1.0.4
 ```
 
-上面的 `1.0.3` 是示例，请替换为本次实际版本。tag 必须采用 `vX.Y.Z` 格式，并与 package 和 manifest 中的版本完全一致；不匹配时构建会终止。当前流程用于稳定版本，不发布带 `-beta` 等后缀的预发布版本。
+上面的 `1.0.4` 是示例，请替换为本次实际版本。tag 必须采用 `vX.Y.Z` 格式，并与 package 和 manifest 中的版本完全一致；不匹配时构建会终止。当前流程用于稳定版本，不发布带 `-beta` 等后缀的预发布版本。
 
 工作流先完成测试、类型检查、构建、Chromium 端到端测试和 ZIP 完整性检查，再下载并核对同一次运行的构建产物，自动创建对应 tag 的 GitHub Release，附上：
 
